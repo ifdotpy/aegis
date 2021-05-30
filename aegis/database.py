@@ -10,6 +10,7 @@ import time
 
 # Extern Imports
 import tornado.options
+from tornado.ioloop import IOLoop
 from tornado.options import options
 
 # Project Imports
@@ -92,8 +93,8 @@ def db(use_schema=None, autocommit=True):
     return dbconns.databases[use_schema]
 
 
-def dbnow(use_schema=None):
-    return db(use_schema).get("SELECT NOW()")
+async def dbnow(use_schema=None):
+    return await db(use_schema).get("SELECT NOW(), pg_sleep(5)")
 
 def sql_in_format(lst, cast):
     lst = [cast(lst_item) for lst_item in lst]
@@ -188,9 +189,9 @@ class PostgresConnection(object):
             self._db.rollback()
             self._txn = None
 
-    def _execute(self, cursor, query, parameters, **kwargs):
+    async def _execute(self, cursor, query, parameters, **kwargs):
         try:
-            cursor.execute(query, parameters)
+            await IOLoop.current().run_in_executor(None, cursor.execute, query, parameters)
             return
         except psycopg2.Error as ex:
             logging.error("General Error at PostgreSQL - close connection/rollback")
@@ -199,11 +200,11 @@ class PostgresConnection(object):
             raise
 
 
-    def query(self, query, *parameters, **kwargs):
+    async def query(self, query, *parameters, **kwargs):
         """ Returns a row list for the given query and parameters."""
         cursor = self._cursor()
         try:
-            self._execute(cursor, query, parameters, **kwargs)
+            await self._execute(cursor, query, parameters, **kwargs)
             column_names = [d[0] for d in cursor.description]
             cls = kwargs.get('cls')
             if cls:
@@ -217,9 +218,9 @@ class PostgresConnection(object):
             if not self._txn:
                 cursor.close()
 
-    def get(self, query, *parameters, **kwargs):
+    async def get(self, query, *parameters, **kwargs):
         """ Returns the first row returned for the given query."""
-        rows = self.query(query, *parameters, **kwargs)
+        rows = await self.query(query, *parameters, **kwargs)
         if not rows:
             return None
         elif len(rows) > 1:
@@ -227,18 +228,18 @@ class PostgresConnection(object):
         else:
             return rows[0]
 
-    def execute(self, query, *parameters, **kwargs):
+    async def execute(self, query, *parameters, **kwargs):
         # If it's an INSERT, return the lastrowid. Otherwise return the rowcount.
         if query.startswith('INSERT'):
-            return self.execute_lastrowid(query, *parameters, **kwargs)
+            return await self.execute_lastrowid(query, *parameters, **kwargs)
         else:
-            return self.execute_rowcount(query, *parameters, **kwargs)
+            return await self.execute_rowcount(query, *parameters, **kwargs)
 
-    def execute_lastrowid(self, query, *parameters, **kwargs):
+    async def execute_lastrowid(self, query, *parameters, **kwargs):
         # Executes the given query, returning the lastrowid from the query.
         cursor = self._cursor()
         try:
-            self._execute(cursor, query, parameters)
+            await self._execute(cursor, query, parameters)
             if cursor.rowcount > 0:
                 try:
                     return cursor.fetchone()[0]
@@ -249,11 +250,11 @@ class PostgresConnection(object):
             if not self._txn:
                 cursor.close()
 
-    def execute_rowcount(self, query, *parameters, **kwargs):
+    async def execute_rowcount(self, query, *parameters, **kwargs):
         # Executes the given query, returning the rowcount from the query.
         cursor = self._cursor()
         try:
-            self._execute(cursor, query, parameters)
+            await self._execute(cursor, query, parameters)
             return cursor.rowcount
         finally:
             if not self._txn:
