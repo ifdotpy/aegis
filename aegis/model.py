@@ -67,20 +67,20 @@ class UserAgent(aegis.database.Row):
         return db().execute(sql, user_agent_tx, user_agent_md5)
 
     @classmethod
-    def get_agent(cls, user_agent_tx):
+    async def get_agent(cls, user_agent_tx):
         user_agent_md5 = hashlib.md5(str(user_agent_tx).encode('utf-8')).hexdigest()
         sql = 'SELECT * FROM user_agent WHERE user_agent_md5=%s'
-        return db().get(sql, user_agent_md5, cls=cls)
+        return await db().get(sql, user_agent_md5, cls=cls)
 
     @classmethod
-    def set_user_agent(cls, user_agent_tx):
-        user_agent_row = cls.get_agent(user_agent_tx)
+    async def set_user_agent(cls, user_agent_tx):
+        user_agent_row = await cls.get_agent(user_agent_tx)
         if not user_agent_row:
             try:
                 user_agent_id = cls.insert(user_agent_tx)
                 user_agent_row = cls.get_id(user_agent_id)
             except (aegis.database.PgsqlIntegrityError, aegis.database.MysqlIntegrityError) as ex:
-                user_agent_row = cls.get_agent(user_agent_tx)
+                user_agent_row = await cls.get_agent(user_agent_tx)
                 if not user_agent_row:
                     logging.exception(ex)
         return user_agent_row

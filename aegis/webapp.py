@@ -80,14 +80,14 @@ class AegisHandler(tornado.web.RequestHandler):
         self.models['UserAgent'] = aegis.model.UserAgent
         self.models['User'] = aegis.model.User
 
-    def prepare(self):
+    async def prepare(self):
         self.set_header('Cache-Control', 'no-cache, no-store')
         self.set_header('Pragma', 'no-cache')
         self.set_header('Expires', 'Fri, 21 Dec 2012 03:08:13 GMT')
         self.tmpl['request_name'] = self.page_name = '%s.%s' % (self.__class__.__name__, self.request.method)
         self.tmpl['next_url'] = self.get_next_url()
         self.request.args = dict([(key, self.get_argument(key, strip=False)) for key, val in self.request.arguments.items()])
-        self.setup_user()
+        await self.setup_user()
         super(AegisHandler, self).prepare()
 
     def finish(self, chunk=None):
@@ -119,7 +119,7 @@ class AegisHandler(tornado.web.RequestHandler):
         req_str = "%s})" % req_str.rstrip(', ')
         logging.warning(req_str)
 
-    def setup_user(self):
+    async def setup_user(self):
         # Set up user-cookie tracking system, based on user-agent
         if not self.tmpl['user_agent']:
             self.tmpl['user_agent'] = 'NULL USER AGENT'
@@ -131,7 +131,7 @@ class AegisHandler(tornado.web.RequestHandler):
         if not (aegis.config.get('pg_database') or aegis.config.get('mysql_database')):
             return
         self.tmpl['user'] = {}
-        user_agent = self.models['UserAgent'].set_user_agent(self.tmpl['user_agent'])
+        user_agent = await self.models['UserAgent'].set_user_agent(self.tmpl['user_agent'])
         # if ua_json not set, set it
         if not user_agent.get('user_agent_json') and ua_json:
             ua_json = json.dumps(ua_json, cls=aegis.stdlib.DateTimeEncoder)
@@ -427,8 +427,8 @@ class JsonRestApi(AegisHandler):
         super(JsonRestApi, self).__init__(*args, **kwargs)
         self.debug = False
 
-    def prepare(self):
-        super(JsonRestApi, self).prepare()
+    async def prepare(self):
+        await super(JsonRestApi, self).prepare()
         if aegis.config.get('api_token_header'):
             api_token_value = self.request.headers.get(options.api_token_header)
             if not api_token_value or api_token_value != options.api_token_value:
@@ -622,8 +622,8 @@ class WebApplication(AegisApplication, tornado.web.Application):
 
 
 class AegisWeb(AegisHandler):
-    def prepare(self):
-        super(AegisWeb, self).prepare()
+    async def prepare(self):
+        await super(AegisWeb, self).prepare()
         self.tmpl['page_title'] = self.tmpl['request_name'].split('.')[0].replace('Aegis', '')
         self.tmpl['home_link'] = '/admin'
         self.tmpl['aegis_dir'] = aegis.config.aegis_dir()
