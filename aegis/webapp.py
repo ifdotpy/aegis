@@ -138,7 +138,7 @@ class AegisHandler(tornado.web.RequestHandler):
             user_agent.set_ua_json(ua_json)
         if self.user_is_robot():
             self.models['UserAgent'].set_robot_ind(user_agent['user_agent_id'], True)
-            user_agent = self.models['UserAgent'].get_id(user_agent['user_agent_id'])
+            user_agent = await self.models['UserAgent'].get_id(user_agent['user_agent_id'])
         # Set up all robots to use the same user_id, based on the user-agent string, and don't bother with cookies.
         # Regular users just get tagged with a user cookie matching a row.
         user = None
@@ -147,18 +147,18 @@ class AegisHandler(tornado.web.RequestHandler):
                 user_id = self.models['User'].insert(user_agent['user_agent_id'])
                 self.models['UserAgent'].set_robot_user_id(user_agent['user_agent_id'], user_id)
                 user_agent = self.models['UserAgent'].get_id(user_agent['user_agent_id'])
-            user = self.models['User'].get_id(user_agent['robot_user_id'])
+            user = await self.models['User'].get_id(user_agent['robot_user_id'])
             user_ck = {}
         else:
             # Check if the cookie exists, and if the record exists. If either doesn't exist, start a new user record.
             user_ck = self.cookie_get('user')
             if user_ck and user_ck.get('user_id'):
-                user = self.models['User'].get_id(user_ck['user_id'])
+                user = await self.models['User'].get_id(user_ck['user_id'])
                 if user:
                     self.cookie_set('user', user_ck)
             if not user:
                 user_id = self.models['User'].insert(user_agent['user_agent_id'])
-                user = self.models['User'].get_id(user_id)
+                user = await self.models['User'].get_id(user_id)
                 if user_ck:
                     user_ck['user_id'] = user_id
                 else:

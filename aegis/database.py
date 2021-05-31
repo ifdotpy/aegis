@@ -535,7 +535,7 @@ class Row(dict):
         return items
 
     @classmethod
-    def get_id(cls, column_id_val, member_id=None, dbconn=None):
+    async def get_id(cls, column_id_val, member_id=None, dbconn=None):
         if not column_id_val:
             return None
         sql = 'SELECT * FROM %s WHERE %s=%%s'
@@ -546,7 +546,7 @@ class Row(dict):
         sql = sql % (cls._table_name(), cls.id_column)
         if not dbconn:
             dbconn = db()
-        val = dbconn.get(sql, *args, cls=cls)
+        val = await dbconn.get(sql, *args, cls=cls)
         return val
 
     @classmethod
